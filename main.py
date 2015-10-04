@@ -1,32 +1,50 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
-import requests, json, os
+import requests, json, os, itertools
 from multiprocessing.dummy import Pool as ThreadPool
-#import language_check
-#import pprint
-searchDepthThreshold = 10
-def wikidataSearch(name):
-	result = requests.get('https://www.wikidata.org/w/api.php',params={
-	'action':'wbsearchentities',
-	'search':name,
-	'language':'en',
-	'format':'json'
-	}).json()['search']
-	if result==[]:
-		print 'WARNING: No match found.'
-		return ''
-	return result[0]['title']
+#import language_check, pprint
+userInputCache = {}
+def wikiRequestWrapper(params):
+	return requests.get('https://www.wikidata.org/w/api.php',params=params).json()
+def wikidataSearch(userInput):
+	if userInputCache.has_key(userInput):
+		return userInputCache[userInput]
+	else:
+		result = wikiRequestWrapper({
+			'action':'wbsearchentities',
+			'search':userInput,
+			'language':'en',
+			'format':'json',
+			'limit':'1'})
+		if result['success']!=1:
+			print 'WARNING: No match found.'
+			result = ''
+		try:
+			result = result['search'][0]['title']
+		except:
+			result = ''
+		userInputCache[userInput] = result
+		return result
+wikiLinkCache = {}
 def getWikiLink(itemId):
-	result = requests.get('https://www.wikidata.org/w/api.php',params={
-	'action':'wbgetentities',
-	'ids':itemId,
-	'props':'sitelinks',
-	'format':'json'
-	}).json()
-	if result['success']!=1:
-		print 'WARNING: No match found.'
-		return ''
-	return result['entities'][itemId]['sitelinks']['enwiki']['title']
+	if wikiLinkCache.has_key(itemId):
+		return wikiLinkCache[itemId]
+	else:
+		result = wikiRequestWrapper({
+			'action':'wbgetentities',
+			'ids':itemId,
+			'props':'sitelinks',
+			'format':'json'})
+		if result['success']!=1:
+			print 'WARNING: No match found.'
+			return ''
+		else:
+			try:
+				wikiLink = result['entities'][itemId]['sitelinks']['enwiki']['title']
+			except KeyError:
+				wikiLink = ''
+			wikiLinkCache[itemId] = wikiLink
+		return wikiLink
 claimsCache = {}
 def wikidataGetClaims(entityId):
 	#print 'Retriving claims for',entityId
@@ -34,11 +52,11 @@ def wikidataGetClaims(entityId):
 		return claimsCache[entityId]
 	else:
 		claims = {}
-		for propertyId,v in requests.get('https://www.wikidata.org/w/api.php',params={
-		'action':'wbgetclaims',
-		'entity':entityId,
-		'format':'json'
-		}).json()['claims'].items():
+		for propertyId,v in wikiRequestWrapper({
+			'action':'wbgetclaims',
+			'entity':entityId,
+			'format':'json'
+		})['claims'].items():
 			itemIds = []
 			for va in v:
 				mainSnak = va['mainsnak']
@@ -60,25 +78,33 @@ def wikidataGetEntityLabel(entityId):
 		return labelCache[entityId]
 	else:
 		try:
-			label = requests.get('https://www.wikidata.org/w/api.php',params={
+			result = wikiRequestWrapper({
 					'action':'wbgetentities',
 					'props':'labels',
 					'ids':entityId,
 					'languages':'en',
 					'format':'json'
-					}).json()['entities'][entityId]['labels']['en']['value']
+				})
+			label = result['entities'][entityId]['labels']['en']['value']
 			labelCache[entityId] = label
 			return label
 		except:
 			return entityId
 def naturallyDescribeWithClaims(claimsInList):
 	result = ''
+	pool = ThreadPool(200) # Sets the pool size
+	results = pool.map(wikidataGetEntityLabel, itertools.chain(*claimsInList))
+	pool.close()	#close the pool 
+	pool.join()		#wait for the work to finish
 	for propertyId,itemId in claimsInList:
-		result = result + wikidataGetEntityLabel(propertyId)+' '+\
-						wikidataGetEntityLabel(itemId)+'. '
+		result = result + wikidataGetEntityLabel(propertyId)+' '+wikidataGetEntityLabel(itemId)+'. '
 	return result
 def convertClaimsFromIdsToLabels(claimsInList):
 	result = []
+	pool = ThreadPool(200) # Sets the pool size
+	results = pool.map(wikidataGetEntityLabel, itertools.chain(*claimsInList))
+	pool.close()	#close the pool 
+	pool.join()		#wait for the work to finish
 	for propertyId,itemId in claimsInList:
 		result += [(wikidataGetEntityLabel(propertyId),
 					wikidataGetEntityLabel(itemId))]
@@ -89,34 +115,6 @@ def expandClaimsForLooping(claimsInDict):
 		for itemId in itemIds:
 			claimsInList.append((propertyId,itemId))
 	return claimsInList
-# depthFromA = 0
-# depthFromB = 0
-# currentPathFromA = []
-# currentPathFromB = []
-# nodesToCheckFromA = []
-# nodesWithKnownShortestPaths = {}
-# def stepForwardFromA():
-# 	possibleSolution = []
-# 	for nodeId in nodesToCheckFromA:
-# 		if nodeId in nodesWithKnownShortestPaths.viewkeys():
-# 			knownPathToThisNode = nodesWithKnownShortestPaths[nodeId]
-# 			if knownPathToThisNode[0][1]==ItemAId:
-# 				#This path is found starting from this side.
-# 				currentPathFromA = 1
-# 				if len(currentPathFromA)<len(knownPathToThisNode):
-# 					nodesWithKnownShortestPaths[nodeId] = currentPathFromA
-# 			else:
-# 				#This shortest path is found from the other side!! Yeahhh!
-# 				knownPathToThisNode.reverse()
-# 				newSolution = currentPathFromA+knownPathToThisNode
-# 				if len(possibleSolution)==0 or len(possibleSolution)>newSolution:
-# 					possibleSolution = newSolution
-# 	if possibleSolution==[]:
-# 		return False
-# 	else:
-# 		print possibleSolution
-# 		return True
-
 try:
 	f = open('dump.txt','r')
 	knownShortestPathsToTarget = json.loads(f.read())
@@ -184,29 +182,44 @@ def DEBUGdumpTheBSide():
 	f = open('dump.txt','w+')
 	f.write(json.dumps(shortestPaths, sort_keys=True))
 	f.close()
+answerCache = {}
 
 from flask import Flask, render_template, request, jsonify#, redirect, url_for, send_from_directory
 app = Flask(__name__)
 @app.route('/')
 def index():
-	try:
-		userInput = request.args.get('q', '')
-		print 'userInput:',userInput
-		userInputAsId = wikidataSearch(userInput)
-		if userInputAsId=='': #no such thing!
-			return jsonify(resultInIds=[], resultInLabels=[], wikiLinks=[], naturalDescription='No such thing.')
+	global bestAnswer
+	#try:
+	userInput = request.args.get('q', '')
+	print 'userInput:',userInput
+	userInputAsId = wikidataSearch(userInput)
+	if userInputAsId=='': #no such thing!
+		return jsonify(resultInIds=[], resultInLabels=[], wikiLinks=[], naturalDescription='No such thing.')
+	else:
+		print 'userInputAsId:',userInputAsId,
+		if answerCache.has_key(userInputAsId):
+			print ', which is already queried before.'
+			bestAnswer = answerCache[userInputAsId]
 		else:
-			print 'userInputAsId:',userInputAsId
+			print ', which is a new search.'
 			findPath(userInputAsId)
-			if bestAnswer==[]:
-				return jsonify(resultInIds=[], resultInLabels=[], wikiLinks=[], naturalDescription='No relationship found.')
-			else:
-				wikiLinks = {}
-				for propertyId,itemId in bestAnswer:
+			answerCache[userInputAsId] = bestAnswer
+		if bestAnswer==[]:
+			return jsonify(resultInIds=[], resultInLabels=[], wikiLinks=[], naturalDescription='No relationship found.')
+		else:
+			print 'Finding Wikipedia links...'
+			wikiLinks = {}
+			pool = ThreadPool(200) # Sets the pool size
+			pool.map(getWikiLink, [itemId for propertyId,itemId in bestAnswer])
+			pool.close()	#close the pool 
+			pool.join()		#wait for the work to finish
+			for propertyId,itemId in bestAnswer:
+				thisWikiLink = getWikiLink(itemId)
+				if thisWikiLink!='':	#some maybe empty (due to cache)
 					wikiLinks[itemId]=getWikiLink(itemId)
-				return jsonify(resultInIds=bestAnswer, resultInLabels=convertClaimsFromIdsToLabels(bestAnswer), wikiLinks=wikiLinks, naturalDescription=naturallyDescribeWithClaims(bestAnswer))
-	except:
-		return jsonify(resultInIds=[], resultInLabels=[], wikiLinks=[], naturalDescription='Something went wrong.')
+			return jsonify(resultInIds=bestAnswer, resultInLabels=convertClaimsFromIdsToLabels(bestAnswer), wikiLinks=wikiLinks, naturalDescription=naturallyDescribeWithClaims(bestAnswer))
+	#except:
+	#	return jsonify(resultInIds=[], resultInLabels=[], wikiLinks=[], naturalDescription='Something went wrong.')
 if __name__=='__main__':
 	app.run(host="0.0.0.0",port=int("80"),debug=True)#,threaded=True)
 	##DEBUGdumpTheBSide()
