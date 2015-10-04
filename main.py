@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
-import requests, json
+import requests, json, os
 from multiprocessing.dummy import Pool as ThreadPool
 #import language_check
 #import pprint
@@ -175,9 +175,6 @@ def DEBUGdumpTheBSide():
 from flask import Flask, render_template, request, jsonify#, redirect, url_for, send_from_directory
 app = Flask(__name__)
 @app.route('/')
-#def index():
-#	return render_template('index.html')
-#@app.route('/run')
 def index():
 	userInput = request.args.get('q', '')
 	print 'userInput:',userInput
@@ -191,7 +188,7 @@ def index():
 			return jsonify(resultInIds=[], resultInLabels=[], naturalDescription='No relationship found.')
 		else:
 			return jsonify(resultInIds=bestAnswer, resultInLabels=convertClaimsFromIdsToLabels(bestAnswer), naturalDescription=naturallyDescribeWithClaims(bestAnswer))
-app.run(host="0.0.0.0",port=int("80"),debug=False)#,threaded=True)
+#app.run(host="0.0.0.0",port=int("80"),debug=False)#,threaded=True)
 ##DEBUGdumpTheBSide()
 #Set up the language checker:
 #languageTool = language_check.LanguageTool('en-CA')
