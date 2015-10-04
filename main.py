@@ -123,7 +123,9 @@ def explore(testItemId):
 		if itemId in knownShortestPathsToTarget.keys():
 			print 'SUCCESS!'
 			ifFoundAnswer = True
-			newAnswer = newPath+knownShortestPathsToTarget[itemId]
+			knownShortestPathToTarget = knownShortestPathsToTarget[itemId]
+			knownShortestPathToTarget.reverse()
+			newAnswer = newPath+knownShortestPathToTarget
 			if len(bestAnswer)>len(newAnswer) or len(bestAnswer)==0:
 				print 'Updating best answer from', bestAnswer, 'to', newAnswer,'.'
 				bestAnswer = newAnswer
