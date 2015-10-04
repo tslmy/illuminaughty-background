@@ -16,6 +16,17 @@ def wikidataSearch(name):
 		print 'WARNING: No match found.'
 		return ''
 	return result[0]['title']
+def getWikiLink(itemId):
+	result = requests.get('https://www.wikidata.org/w/api.php',params={
+	'action':'wbgetentities',
+	'ids':itemId,
+	'props':'sitelinks',
+	'format':'json'
+	}).json()
+	if result['success']!=1:
+		print 'WARNING: No match found.'
+		return ''
+	return result['entities'][itemId]['sitelinks']['enwiki']
 claimsCache = {}
 def wikidataGetClaims(entityId):
 	#print 'Retriving claims for',entityId
@@ -183,16 +194,16 @@ def index():
 		print 'userInput:',userInput
 		userInputAsId = wikidataSearch(userInput)
 		if userInputAsId=='': #no such thing!
-			return jsonify(resultInIds=[], resultInLabels=[], naturalDescription='No such thing.')
+			return jsonify(resultInIds=[], resultInLabels=[], wikiLinks=[], naturalDescription='No such thing.')
 		else:
 			print 'userInputAsId:',userInputAsId
 			findPath(userInputAsId)
 			if bestAnswer==[]:
-				return jsonify(resultInIds=[], resultInLabels=[], naturalDescription='No relationship found.')
+				return jsonify(resultInIds=[], resultInLabels=[], wikiLinks=[], naturalDescription='No relationship found.')
 			else:
-				return jsonify(resultInIds=bestAnswer, resultInLabels=convertClaimsFromIdsToLabels(bestAnswer), naturalDescription=naturallyDescribeWithClaims(bestAnswer))
+				return jsonify(resultInIds=bestAnswer, resultInLabels=convertClaimsFromIdsToLabels(bestAnswer), wikiLinks=set([(itemId,getWikiLink(itemId)) for propertyId,itemId in bestAnswer]), naturalDescription=naturallyDescribeWithClaims(bestAnswer))
 	except:
-		return jsonify(resultInIds=[], resultInLabels=[], naturalDescription='Something went wrong.')
+		return jsonify(resultInIds=[], resultInLabels=[], wikiLinks=[], naturalDescription='Something went wrong.')
 #app.run(host="0.0.0.0",port=int("80"),debug=False)#,threaded=True)
 ##DEBUGdumpTheBSide()
 #Set up the language checker:
