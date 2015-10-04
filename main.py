@@ -176,18 +176,21 @@ from flask import Flask, render_template, request, jsonify#, redirect, url_for, 
 app = Flask(__name__)
 @app.route('/')
 def index():
-	userInput = request.args.get('q', '')
-	print 'userInput:',userInput
-	userInputAsId = wikidataSearch(userInput)
-	if userInputAsId=='': #no such thing!
-		return jsonify(resultInIds=[], resultInLabels=[], naturalDescription='No such thing.')
-	else:
-		print 'userInputAsId:',userInputAsId
-		findPath(userInputAsId)
-		if bestAnswer==[]:
-			return jsonify(resultInIds=[], resultInLabels=[], naturalDescription='No relationship found.')
+	try:
+		userInput = request.args.get('q', '')
+		print 'userInput:',userInput
+		userInputAsId = wikidataSearch(userInput)
+		if userInputAsId=='': #no such thing!
+			return jsonify(resultInIds=[], resultInLabels=[], naturalDescription='No such thing.')
 		else:
-			return jsonify(resultInIds=bestAnswer, resultInLabels=convertClaimsFromIdsToLabels(bestAnswer), naturalDescription=naturallyDescribeWithClaims(bestAnswer))
+			print 'userInputAsId:',userInputAsId
+			findPath(userInputAsId)
+			if bestAnswer==[]:
+				return jsonify(resultInIds=[], resultInLabels=[], naturalDescription='No relationship found.')
+			else:
+				return jsonify(resultInIds=bestAnswer, resultInLabels=convertClaimsFromIdsToLabels(bestAnswer), naturalDescription=naturallyDescribeWithClaims(bestAnswer))
+	except:
+		return jsonify(resultInIds=[], resultInLabels=[], naturalDescription='Something went wrong.')
 #app.run(host="0.0.0.0",port=int("80"),debug=False)#,threaded=True)
 ##DEBUGdumpTheBSide()
 #Set up the language checker:
