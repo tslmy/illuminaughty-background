@@ -26,7 +26,7 @@ def getWikiLink(itemId):
 	if result['success']!=1:
 		print 'WARNING: No match found.'
 		return ''
-	return result['entities'][itemId]['sitelinks']['enwiki']
+	return result['entities'][itemId]['sitelinks']['enwiki']['title']
 claimsCache = {}
 def wikidataGetClaims(entityId):
 	#print 'Retriving claims for',entityId
@@ -201,14 +201,18 @@ def index():
 			if bestAnswer==[]:
 				return jsonify(resultInIds=[], resultInLabels=[], wikiLinks=[], naturalDescription='No relationship found.')
 			else:
-				return jsonify(resultInIds=bestAnswer, resultInLabels=convertClaimsFromIdsToLabels(bestAnswer), wikiLinks=set([(itemId,getWikiLink(itemId)) for propertyId,itemId in bestAnswer]), naturalDescription=naturallyDescribeWithClaims(bestAnswer))
+				wikiLinks = {}
+				for propertyId,itemId in bestAnswer:
+					wikiLinks[itemId]=getWikiLink(itemId)
+				return jsonify(resultInIds=bestAnswer, resultInLabels=convertClaimsFromIdsToLabels(bestAnswer), wikiLinks=wikiLinks, naturalDescription=naturallyDescribeWithClaims(bestAnswer))
 	except:
 		return jsonify(resultInIds=[], resultInLabels=[], wikiLinks=[], naturalDescription='Something went wrong.')
-#app.run(host="0.0.0.0",port=int("80"),debug=False)#,threaded=True)
-##DEBUGdumpTheBSide()
-#Set up the language checker:
-#languageTool = language_check.LanguageTool('en-CA')
-#Fix the language:
-#languageCheckerMatches = languageTool.check(naturalDescription)
-#naturalDescription = language_check.correct(naturalDescription, languageCheckerMatches)
+if __name__=='__main__':
+	app.run(host="0.0.0.0",port=int("80"),debug=True)#,threaded=True)
+	##DEBUGdumpTheBSide()
+	#Set up the language checker:
+	#languageTool = language_check.LanguageTool('en-CA')
+	#Fix the language:
+	#languageCheckerMatches = languageTool.check(naturalDescription)
+	#naturalDescription = language_check.correct(naturalDescription, languageCheckerMatches)
 #print naturalDescription
