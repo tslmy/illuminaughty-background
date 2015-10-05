@@ -189,37 +189,37 @@ app = Flask(__name__)
 @app.route('/')
 def index():
 	global bestAnswer
-	#try:
-	userInput = request.args.get('q', '')
-	print 'userInput:',userInput
-	userInputAsId = wikidataSearch(userInput)
-	if userInputAsId=='': #no such thing!
-		return jsonify(resultInIds=[], resultInLabels=[], wikiLinks=[], naturalDescription='No such thing.')
-	else:
-		print 'userInputAsId:',userInputAsId,
-		if answerCache.has_key(userInputAsId):
-			print ', which is already queried before.'
-			bestAnswer = answerCache[userInputAsId]
+	try:
+		userInput = request.args.get('q', '')
+		print 'userInput:',userInput
+		userInputAsId = wikidataSearch(userInput)
+		if userInputAsId=='': #no such thing!
+			return jsonify(resultInIds=[], resultInLabels=[], wikiLinks=[], naturalDescription='No such thing.')
 		else:
-			print ', which is a new search.'
-			findPath(userInputAsId)
-			answerCache[userInputAsId] = bestAnswer
-		if bestAnswer==[]:
-			return jsonify(resultInIds=[], resultInLabels=[], wikiLinks=[], naturalDescription='No relationship found.')
-		else:
-			print 'Finding Wikipedia links...'
-			wikiLinks = {}
-			pool = ThreadPool(200) # Sets the pool size
-			pool.map(getWikiLink, [itemId for propertyId,itemId in bestAnswer])
-			pool.close()	#close the pool 
-			pool.join()		#wait for the work to finish
-			for propertyId,itemId in bestAnswer:
-				thisWikiLink = getWikiLink(itemId)
-				if thisWikiLink!='':	#some maybe empty (due to cache)
-					wikiLinks[itemId]=getWikiLink(itemId)
-			return jsonify(resultInIds=bestAnswer, resultInLabels=convertClaimsFromIdsToLabels(bestAnswer), wikiLinks=wikiLinks, naturalDescription=naturallyDescribeWithClaims(bestAnswer))
-	#except:
-	#	return jsonify(resultInIds=[], resultInLabels=[], wikiLinks=[], naturalDescription='Something went wrong.')
+			print 'userInputAsId:',userInputAsId,
+			if answerCache.has_key(userInputAsId):
+				print ', which is already queried before.'
+				bestAnswer = answerCache[userInputAsId]
+			else:
+				print ', which is a new search.'
+				findPath(userInputAsId)
+				answerCache[userInputAsId] = bestAnswer
+			if bestAnswer==[]:
+				return jsonify(resultInIds=[], resultInLabels=[], wikiLinks=[], naturalDescription='No relationship found.')
+			else:
+				print 'Finding Wikipedia links...'
+				wikiLinks = {}
+				pool = ThreadPool(200) # Sets the pool size
+				pool.map(getWikiLink, [itemId for propertyId,itemId in bestAnswer])
+				pool.close()	#close the pool 
+				pool.join()		#wait for the work to finish
+				for propertyId,itemId in bestAnswer:
+					thisWikiLink = getWikiLink(itemId)
+					if thisWikiLink!='':	#some maybe empty (due to cache)
+						wikiLinks[itemId]=getWikiLink(itemId)
+				return jsonify(resultInIds=bestAnswer, resultInLabels=convertClaimsFromIdsToLabels(bestAnswer), wikiLinks=wikiLinks, naturalDescription=naturallyDescribeWithClaims(bestAnswer))
+	except:
+		return jsonify(resultInIds=[], resultInLabels=[], wikiLinks=[], naturalDescription='Something went wrong.')
 if __name__=='__main__':
 	app.run(host="0.0.0.0",port=int("80"),debug=True)#,threaded=True)
 	##DEBUGdumpTheBSide()
